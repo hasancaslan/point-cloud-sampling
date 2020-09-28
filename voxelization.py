@@ -14,13 +14,16 @@ import os
 import IPython.display
 import PIL.Image
 
+test_data_dir = "./test_data"
+
 
 # #### Visualization Configurations
 
-# In[9]:
+# In[4]:
 
 
-interactive = True
+# change to True if you want to interact with the visualization windows
+interactive = not "CI" in os.environ
 
 def jupyter_draw_geometries(
     geoms,
@@ -77,11 +80,11 @@ o3d.visualization.draw_geometries = jupyter_draw_geometries
 
 # ## Point Cloud
 
-# In[3]:
+# In[8]:
 
 
 N = 1000
-pcd = o3d.io.read_point_cloud("./cloud_bin_0.ply")
+pcd = o3d.io.read_point_cloud(f"{test_data_dir}/cloud_bin_0.ply")
 # fit to unit cube
 pcd.scale(1 / np.max(pcd.get_max_bound() - pcd.get_min_bound()),
           center=pcd.get_center())
