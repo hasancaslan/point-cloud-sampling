@@ -1,5 +1,6 @@
 # Sampling Point Cloud
 Sampling and voxelization of large point clouds.
+<br><br>
 
 ## Dependencies
 This project uses [Open3D](https://github.com/intel-isl/Open3D/)[1] for downsampling and voxelization.
@@ -32,7 +33,7 @@ Test your installation with:
 ```bash
 $ python -c "import open3d as o3d"
 ```
-
+<br><br>
 
 ## References
 [1] Qian-Yi Zhou, Jaesik Park, and Vladlen Koltun. Open3D: A modernlibrary for 3D data processing.arXiv:1801.09847, 2018.
