@@ -34,5 +34,6 @@ Test your installation with:
 $ python -c "import open3d as o3d"
 ```
 <br>
+
 ## References
 [1] Qian-Yi Zhou, Jaesik Park, and Vladlen Koltun. Open3D: A modernlibrary for 3D data processing.arXiv:1801.09847, 2018.
