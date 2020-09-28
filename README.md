@@ -7,7 +7,7 @@ For documentation please [see.](http://www.open3d.org/docs/release/)
 
 Supports Ubuntu 18.04+, macOS 10.14+ and
 Windows 10 (64-bit) with Python 3.5, 3.6, 3.7 and 3.8.
-<br/><br/>
+<br><br>
 
 * To install Open3D with pip:
 
@@ -25,7 +25,7 @@ Windows 10 (64-bit) with Python 3.5, 3.6, 3.7 and 3.8.
     
 * To compile Open3D from source:
     * See [compiling from source](http://www.open3d.org/docs/release/compilation.html).
-
+<br><br>
 
 Test your installation with:
 
