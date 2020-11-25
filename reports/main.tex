@@ -99,10 +99,10 @@
 
 \section{Report}
 
-We had LIDAR scans from different periods of historical buildings and the data is in the form of large-scale point clouds. We basically compared these point clouds to understand the deformation of the structure. In order to apply our algorithm for this data, we first need to prepare data as we can use - and since point clouds consist of millions of points we need to down sample the data. We decided to do voxelization of our data to represent it in a continuous domain. We had two main approaches for this purpose, i.e. Open3D voxelization methods with \texttt{voxel\_down\_sample\_and\_trace}, and Open3D  \texttt{voxel\_down\_sample} with our tracing method.
+We had LIDAR scans from different periods of historical buildings and the data is in the form of large-scale point clouds. We basically compared these point clouds to understand the deformation of the structure. In order to apply our algorithm for this data, we first need to prepare data as we can use - and since point clouds consist of millions of points we need to down sample the data. We decided to do voxelization of our data to represent it in a continuous domain. We had two main approaches for this purpose, i.e. Open3D\cite{Zhou2018} voxelization methods with \texttt{voxel\_down\_sample\_and\_trace}, and Open3D\cite{Zhou2018}  \texttt{voxel\_down\_sample} with our tracing method.
 
 \subsection{Using Open3D Methods}
-In our first approach, we did voxelization and down sampling with Open3D methods using \texttt{voxel\_down\_sample\_and\_trace}. This method was successful to downsample the data and it took center points of a voxel as a reference. However, when we get the voxelized point cloud, we want to take their corresponding indexes in the original point cloud. We tried to track and trace methods of Open3D but it did not satisfy our needs. Hence, the issue with this approach was we could not get the points in a voxel in the original point cloud. 
+In our first approach, we did voxelization and down sampling with Open3D\cite{Zhou2018} methods using \texttt{voxel\_down\_sample\_and\_trace}. This method was successful to downsample the data and it took center points of a voxel as a reference. However, when we get the voxelized point cloud, we want to take their corresponding indexes in the original point cloud. We tried to track and trace methods of Open3D\cite{Zhou2018} but it did not satisfy our needs. Hence, the issue with this approach was we could not get the points in a voxel in the original point cloud. 
 
 \begin{lstlisting}[caption={Voxel down sampling with our test data using \texttt{voxel\_down\_sample\_and\_trace}.}]
 # Parameters
@@ -124,7 +124,7 @@ out1, out2, out3 = pcd.voxel_down_sample_and_trace(voxel_size=voxel_size, min_bo
 \end{lstlisting}
 
 \subsection{Using Custom Data Structure for Voxels}
-In the second approach, we use \texttt{voxel\_down\_sample} with Open3D methods as we did in the first one. However, since we could not get the points that a voxel contains in the original point cloud, we defined our own Cube class. We were able to access the center points of voxels, so we drew a cube around that center point with a given range of x-y-z coordinates. We basically iterated all points in a for loop – and all the voxels in the outer for loop. So we got the points of each voxel inside a cube object. This approach was satisfied our needs and we got the information that we want; however, the issue with this method was it was too slow since we iterated all points and voxels in the for loops. 
+In the second approach, we use \texttt{voxel\_down\_sample} with Open3D\cite{Zhou2018} methods as we did in the first one. However, since we could not get the points that a voxel contains in the original point cloud, we defined our own Cube class. We were able to access the center points of voxels, so we drew a cube around that center point with a given range of x-y-z coordinates. We basically iterated all points in a for loop – and all the voxels in the outer for loop. So we got the points of each voxel inside a cube object. This approach was satisfied our needs and we got the information that we want; however, the issue with this method was it was too slow since we iterated all points and voxels in the for loops. 
 
 \begin{lstlisting}[caption={Our initial custom voxel-like data structure named \texttt{Cube}.}]
 class Cube(object):
@@ -246,4 +246,10 @@ You can find documentation about packages for voxelization and down sampling at:
 
 \subsection{Further Questions}
 For further questions about the project you may contact \textbf{\contactName} at \href{mailto:\contactMail}{\mbox{[\contactMail]}} or \textbf{\contactNameII} at \href{mailto:\contactMailII}{\mbox{[\contactMailII]}}.
+
+\medskip
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
 \end{document}

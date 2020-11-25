@@ -3,7 +3,7 @@ Sampling and voxelization of large point clouds.
 <br><br>
 
 ## Report
-For full report about project please [see.](/report/indep_report_1.pdf)
+For full report about project please [see.](/reports/report-1.pdf)
 
 ## Dependencies
 This project uses [Open3D](https://github.com/intel-isl/Open3D/)[1] for downsampling and voxelization.
