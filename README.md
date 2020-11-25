@@ -1,4 +1,4 @@
-# Sampling Point Cloud
+# Point Cloud Sampling
 Sampling and voxelization of large point clouds.
 <br><br>
 
