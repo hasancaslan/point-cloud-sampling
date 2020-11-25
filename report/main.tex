@@ -1,0 +1,249 @@
+\documentclass[a4paper]{article}
+
+\usepackage{indentfirst}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage[useregional]{datetime2}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings} 
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{titling}
+\usepackage{upquote}
+\usepackage{color}
+\usepackage{wrapfig}
+\usepackage{authblk}
+
+\setcounter{secnumdepth}{4}
+\setlength{\droptitle}{-4em}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
+%Define colors as shown below to use in text.
+\definecolor{midnightblue}{RGB}{20, 86, 128}
+\definecolor{Red}{RGB}{255, 0, 0}
+\definecolor{Green}{RGB}{0, 255, 0}
+\definecolor{Blue}{RGB}{0, 0, 255}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% code listing style
+\lstset{language=Python}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\renewcommand{\lstlistingname}{Code snippet}
+ 
+\lstset{style=mystyle}
+
+%Date
+\newcommand{\projectDate}{25 November 2020}
+
+%Contact to reach.
+\newcommand{\contactName}{Nursena Köprücü}
+\newcommand{\contactMail}{nkoprucu16@ku.edu.tr}
+\newcommand{\contactNameII}{Hasan Can Aslan}
+\newcommand{\contactMailII}{haslan16@ku.edu.tr}
+
+%Define colors as shown below to use in text.
+\definecolor{Red}{RGB}{255, 0, 0}
+\definecolor{Green}{RGB}{0, 255, 0}
+\definecolor{Blue}{RGB}{0, 0, 255}
+
+%Authors
+\author{Fatma Güney}
+\author{Hasan Can Aslan}
+\author{Nursena Köprücü}
+\affil{Department of Computer Engineering, Koç University}
+
+%Title
+\title{Point Cloud Alignment: Voxelization and Down Sampling}
+\date{\projectDate}
+
+\begin{document}
+
+\lstset{language=Python}
+\pagestyle{fancy}
+\fancyhf{}
+\chead{\projectTitle}
+\rhead{Voxelization and Down Sampling}
+\lhead{Point Cloud Alignment}
+\lfoot{\nouppercase{\leftmark}}
+\rfoot{Page \thepage}
+\thispagestyle{fancy}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\maketitle
+\thispagestyle{empty}
+
+\section{Report}
+
+We had LIDAR scans from different periods of historical buildings and the data is in the form of large-scale point clouds. We basically compared these point clouds to understand the deformation of the structure. In order to apply our algorithm for this data, we first need to prepare data as we can use - and since point clouds consist of millions of points we need to down sample the data. We decided to do voxelization of our data to represent it in a continuous domain. We had two main approaches for this purpose, i.e. Open3D voxelization methods with \texttt{voxel\_down\_sample\_and\_trace}, and Open3D  \texttt{voxel\_down\_sample} with our tracing method.
+
+\subsection{Using Open3D Methods}
+In our first approach, we did voxelization and down sampling with Open3D methods using \texttt{voxel\_down\_sample\_and\_trace}. This method was successful to downsample the data and it took center points of a voxel as a reference. However, when we get the voxelized point cloud, we want to take their corresponding indexes in the original point cloud. We tried to track and trace methods of Open3D but it did not satisfy our needs. Hence, the issue with this approach was we could not get the points in a voxel in the original point cloud. 
+
+\begin{lstlisting}[caption={Voxel down sampling with our test data using \texttt{voxel\_down\_sample\_and\_trace}.}]
+# Parameters
+N = 1000
+voxel_size = 0.02
+
+# Import point cloud
+pcd_path = "{test_data_dir}/cloud_bin_0.ply"
+pcd = o3d.io.read_point_cloud(f"{test_data_dir}/cloud_bin_0.ply")
+
+# Fit to unit cube
+min_bound = pcd.get_min_bound()
+max_bound = pcd.get_max_bound()
+pcd.scale(1 / np.max(max_bound - pcd.min_bound),
+          center=pcd.get_center())
+
+# Voxel down sample and trace
+out1, out2, out3 = pcd.voxel_down_sample_and_trace(voxel_size=voxel_size, min_bound=min_bound, max_bound=max_bound)
+\end{lstlisting}
+
+\subsection{Using Custom Data Structure for Voxels}
+In the second approach, we use \texttt{voxel\_down\_sample} with Open3D methods as we did in the first one. However, since we could not get the points that a voxel contains in the original point cloud, we defined our own Cube class. We were able to access the center points of voxels, so we drew a cube around that center point with a given range of x-y-z coordinates. We basically iterated all points in a for loop – and all the voxels in the outer for loop. So we got the points of each voxel inside a cube object. This approach was satisfied our needs and we got the information that we want; however, the issue with this method was it was too slow since we iterated all points and voxels in the for loops. 
+
+\begin{lstlisting}[caption={Our initial custom voxel-like data structure named \texttt{Cube}.}]
+class Cube(object):
+    def __init__(self, xrange, yrange, zrange):
+        """
+        Builds a cube from x, y and z ranges
+        """
+        self.xrange = xrange
+        self.yrange = yrange
+        self.zrange = zrange
+
+    @classmethod
+    def from_points(cls, firstcorner, secondcorner):
+        """
+        Builds a cube from the bounding points
+        """
+        return cls(*zip(firstcorner, secondcorner))
+
+    @classmethod
+    def from_voxel_size(cls, center, voxel_size):
+        """
+        Builds a cube from the voxel size and center of the voxel
+        """
+        half_center = voxel_size / 2
+        x_range = (center[0]-half_center, center[0]+half_center)
+        y_range = (center[1]-half_center, center[1]+half_center)
+        z_range = (center[2]-half_center, center[2]+half_center)
+        
+        return cls(x_range, y_range, z_range)
+
+    def contains_point(self, p):
+        """
+        Returns given point is in cube
+        """
+        return all([self.xrange[0] <= p[0] <= self.xrange[1],
+                    self.yrange[0] <= p[1] <= self.yrange[1],
+                    self.zrange[0] <= p[2] <= self.zrange[1]])
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Splitting our data into voxels using our \texttt{Cube} structure.}]
+pcdarray = np.asarray(pcd.points)
+downarray = np.asarray(downpcd.points)
+voxels = [Cube.from_voxel_size(center, voxel_size) for center in downarray]
+
+for point in pcdarray:
+    for voxel in voxels:
+        if voxel.contains_point(point):
+            voxel.points_inside.append(point)
+            break
+\end{lstlisting}
+
+\subsection{Using Matrix Representation}
+Finally, we optimized our second approach by using matrix representation. Since we vectorized our calculation it became a very fast and efficient version. We defined an x-y-z range around the points that were downsized and decide whether a voxel consists of that point or not, similarly. Here, some points belonged to many voxels and we could not get the same number of points as the original point cloud. This difference was increased when the voxel size was decreased. It was not a big issue but was a note for future work.
+\begin{lstlisting}[caption={\texttt{Cube} class matrix implementation.}]
+class Cube(object):
+    def __init__(self, range):
+        """
+        Builds a cube from x, y and z ranges
+        """
+        self.range = range
+
+    @classmethod
+    def from_voxel_size(cls, center, voxel_size):
+        """
+        Builds a cube from the voxel size and center of the voxel
+        """
+        cls.center = center
+        half_center = voxel_size / 2
+        x_range = (center[0]-half_center, center[0]+half_center)
+        y_range = (center[1]-half_center, center[1]+half_center)
+        z_range = (center[2]-half_center, center[2]+half_center)
+        range = np.array([[x_range[0], x_range[1], y_range[0] ,y_range[1] ,z_range[0], z_range[1]]])
+        
+        return cls(range)
+
+    def contains_points(self, p):
+        """
+        Returns given point is in cube
+        """
+        less = np.repeat(self.range, repeats=[p.shape[0]], axis=0)[:, 0::2] < p
+        greater = np.repeat(self.range, repeats=[p.shape[0]], axis=0)[:, 1::2] > p
+        filter = np.logical_and(less.all(axis=1), greater.all(axis=1))
+        return p[filter]
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Splitting our data into voxels using our \texttt{Cube} structure using matrix implementation.}]
+pcdarray = np.asarray(pcd.points)
+downarray = np.asarray(downpcd.points)
+
+pcds = []
+voxels = [Cube.from_voxel_size(center, voxel_size) for center in downarray]
+
+for voxel in voxels:
+    pcd_voxel = o3d.geometry.PointCloud()
+    pcd_voxel.points = o3d.utility.Vector3dVector(voxel.contains_points(pcdarray))
+    pcd_voxel.paint_uniform_color(get_random_color())
+    pcds.append(pcd_voxel)
+\end{lstlisting}
+
+\section{Resources}
+\subsection{Source Code}
+You can find all source code at:
+\begin{itemize}
+\item
+\textbf{\href{https://github.com/hasancaslan/point-cloud-sampling}{GitHub}} \href{https://github.com/hasancaslan/point-cloud-sampling}{[https://github.com/hasancaslan/point-cloud-sampling]}.
+\end{itemize}
+
+\subsection{Documentation}
+You can find documentation about packages for voxelization and down sampling at:
+\begin{itemize}
+\item
+\textbf{\href{http://www.open3d.org/docs/0.6.0/index.html}{Open3D Documentation}}
+\href{http://www.open3d.org/docs/0.6.0/index.html}{[http://www.open3d.org/docs/0.6.0/index.html]}
+\item
+\href{http://www.open3d.org/docs/0.6.0/python_api/open3d.geometry.voxel_down_sample.html?highlight=voxel_down_sample}{\texttt{voxel\_down\_sample} documentation.}
+\item
+\href{http://www.open3d.org/docs/0.6.0/python_api/open3d.geometry.voxel_down_sample_and_trace.html}{\texttt{voxel\_down\_sample\_and\_trace} documentation.}
+\end{itemize}
+
+\subsection{Further Questions}
+For further questions about the project you may contact \textbf{\contactName} at \href{mailto:\contactMail}{\mbox{[\contactMail]}} or \textbf{\contactNameII} at \href{mailto:\contactMailII}{\mbox{[\contactMailII]}}.
+\end{document}
