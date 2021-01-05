@@ -1,13 +1,6 @@
 import open3d as o3d
 import numpy as np
-import matplotlib.pyplot as plt
-import copy
-import os
-import IPython.display
-import PIL.Image
 import random
-
-data_dir = "./test_data"
 
 
 class Cube(object):
@@ -69,10 +62,10 @@ points = np.array([[3, 15, -8], [11, 15, -8]])
 cube.contains_points(points)
 
 if __name__ == "__main__":
-    data_dir = "./test_data"
+    data_dir = "./data-set"
     N = 1000
-    voxel_size = 0.2
-    pcd_path = data_dir + "/cloud_bin_0.ply"
+    voxel_size = 0.8
+    pcd_path = data_dir + "/13-11-23-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
 
     print("N:", N, "voxel size:", voxel_size, "path:", pcd_path)
