@@ -102,21 +102,23 @@ if __name__ == "__main__":
 
     for i in range(len(pcds)):
         if i < train_num:
-            batch = i // 30
-            num = i % 30
+            batch = i // 15
+            num = i % 15x
             name = "train"
         elif i < train_num + test_num:
-            batch = (i - train_num) // 30
-            num = (i - train_num) % 30
+            batch = (i - train_num) // 15
+            num = (i - train_num) % 15
             name = "test"
         else:
-            batch = (i - train_num - test_num) // 30
-            num = (i - train_num - test_num) % 30
+            batch = (i - train_num - test_num) // 15
+            num = (i - train_num - test_num) % 15
             name = "val"
 
         filename = f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply"
         o3d.io.write_point_cloud(filename, pcds[i])
 
         f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
-        f.write(f"{filename}\n")
+        f.write(
+            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply\n"
+        )
         f.close()
