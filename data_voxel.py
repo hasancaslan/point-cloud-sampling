@@ -114,11 +114,9 @@ if __name__ == "__main__":
             num = (i - train_num - test_num) % 30
             name = "val"
 
-        o3d.io.write_point_cloud(
-            f"./out/{name}/12_12_14@seq{str(batch).zfill(2)}_{str(num).zfill(3)}.ply",
-            pcds[i],
-        )
+        filename = f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply"
+        o3d.io.write_point_cloud(filename, pcds[i])
 
-        f = open(f"./out/{name}/12_12_14@seq{str(batch).zfill(2)}.txt", "a+")
-        f.write(f"12_12_14@seq{str(batch).zfill(2)}_{str(num).zfill(3)}.ply\n")
+        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
+        f.write(f"{filename}\n")
         f.close()
