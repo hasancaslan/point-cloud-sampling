@@ -1,6 +1,6 @@
 for i in range(18):
     if i < 10:
-        pass
+        continue
     elif i < 14:
         filename = f"./out/train-12_12_14-{i}.txt"
     elif i < 16:
@@ -17,6 +17,6 @@ for i in range(18):
     f = open(filename, "w+")
     for i in range(len(lines) - 1):
         for j in range(i + 1, len(lines)):
-            f.write(lines[i] + " " + lines[j] + "\n")
+            f.write(lines[i] + " " + lines[j] + " " + 0.000000 + "\n")
 
     f.close()
