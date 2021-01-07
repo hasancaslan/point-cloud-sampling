@@ -1,6 +1,7 @@
 import open3d as o3d
 import numpy as np
 import random
+from pyntcloud import PyntCloud
 
 
 class Cube(object):
@@ -64,7 +65,7 @@ cube.contains_points(points)
 if __name__ == "__main__":
     data_dir = "./data-set"
     N = 1000
-    voxel_size = 4
+    voxel_size = 3
     pcd_path = data_dir + "/13-11-23-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
 
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     for i in range(len(pcds)):
         if i < train_num:
             batch = i // 15
-            num = i % 15x
+            num = i % 15
             name = "train"
         elif i < train_num + test_num:
             batch = (i - train_num) // 15
@@ -114,11 +115,15 @@ if __name__ == "__main__":
             num = (i - train_num - test_num) % 15
             name = "val"
 
-        filename = f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply"
-        o3d.io.write_point_cloud(filename, pcds[i])
+        filename = (
+            f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}"
+        )
+        o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
+        cloud = PyntCloud.from_file(f"{filename}.ply")
+        cloud.to_file(f"{filename}.npz")
 
         f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
         f.write(
-            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply\n"
+            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.npz\n"
         )
         f.close()
