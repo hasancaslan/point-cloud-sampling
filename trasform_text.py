@@ -1,6 +1,6 @@
 for i in range(18):
     if i < 10:
-        continue
+        filename = f"./out/train-12_12_14-0{i}.txt"
     elif i < 14:
         filename = f"./out/train-12_12_14-{i}.txt"
     elif i < 16:
