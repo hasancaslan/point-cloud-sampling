@@ -118,9 +118,9 @@ if __name__ == "__main__":
         filename = (
             f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}"
         )
+
         o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
-        cloud = PyntCloud.from_file(f"{filename}.ply")
-        cloud.to_file(f"{filename}.npz")
+        np.savez(f"{filename}.npz", pcd=np.asarray(pcds[i].points))
 
         f = open(f"./out/npz-{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
         f.write(
