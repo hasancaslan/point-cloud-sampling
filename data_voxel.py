@@ -122,8 +122,12 @@ if __name__ == "__main__":
         cloud = PyntCloud.from_file(f"{filename}.ply")
         cloud.to_file(f"{filename}.npz")
 
-        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
+        f = open(f"./out/npz-{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
         f.write(
             f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.npz\n"
+        )
+        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
+        f.write(
+            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply\n"
         )
         f.close()
