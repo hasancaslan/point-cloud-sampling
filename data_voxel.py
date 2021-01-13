@@ -66,7 +66,7 @@ if __name__ == "__main__":
     data_dir = "./data-set"
     N = 1000
     voxel_size = 3
-    pcd_path = data_dir + "/13-11-23-MergedCloud-ply.ply"
+    pcd_path = data_dir + "/12_12_14-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
 
     print("N:", N, "voxel size:", voxel_size, "path:", pcd_path)
