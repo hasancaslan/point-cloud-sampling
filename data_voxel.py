@@ -1,7 +1,6 @@
 import open3d as o3d
 import numpy as np
 import random
-from pyntcloud import PyntCloud
 
 
 class Cube(object):
@@ -68,6 +67,8 @@ if __name__ == "__main__":
     voxel_size = 3
     pcd_path = data_dir + "/12-12-14-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
+
+    print(np.asarray(pcd.points).shape)
 
     print("N:", N, "voxel size:", voxel_size, "path:", pcd_path)
 
