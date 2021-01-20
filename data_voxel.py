@@ -61,6 +61,7 @@ if __name__ == "__main__":
     N = 1000
     voxel_size = 3
     date = "13-11-23"
+    seq = "02"
     pcd_path = data_dir + f"/{date}-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
 
@@ -100,6 +101,7 @@ if __name__ == "__main__":
     )
     print("Writing...")
 
+    # Write point clouds
     for i in range(len(pcds)):
         if i < train_num:
             batch = i // 15
@@ -115,14 +117,40 @@ if __name__ == "__main__":
             name = "val"
 
         filename = (
-            f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-02_{str(num).zfill(3)}"
+            f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-{seq}_{str(num).zfill(3)}"
         )
 
         o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
         array = np.asarray(pcds[i].points)
         np.savez(f"{filename}.npz", pcd=array, color=np.zeros(array.shape, dtype=float))
 
-        f = open(f"./out/{name}-{date}-{str(batch).zfill(2)}.txt", "a+")
-        f.write(f"{name}-{date}-{str(batch).zfill(2)}@seq-02_{str(num).zfill(3)}.npz\n")
+        # Write point cloud file names into text files
+        f = open(f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-{seq}.txt", "a+")
+        f.write(
+            f"{name}-{date}-{str(batch).zfill(2)}@seq-{seq}_{str(num).zfill(3)}.npz\n"
+        )
+
+        f.close()
+
+    # Change text file's format
+    for i in range(18):
+        if i < 10:
+            filename = f"./out/train-12_12_14-0{i}@seq-{seq}.txt"
+        elif i < 14:
+            filename = f"./out/train-12_12_14-{i}@seq-{seq}.txt"
+        elif i < 16:
+            filename = f"./out/test-12_12_14-0{i%2}@seq-{seq}.txt"
+        else:
+            filename = f"./out/val-12_12_14-0{i%2}@seq-{seq}.txt"
+
+        f = open(filename, "r")
+        lines = []
+        for line in f.readlines():
+            lines.append(line.strip())
+
+        f = open(filename, "w+")
+        for i in range(len(lines) - 1):
+            for j in range(i + 1, len(lines)):
+                f.write(lines[i] + " " + lines[j] + " " + "0.000000" + "\n")
 
         f.close()
