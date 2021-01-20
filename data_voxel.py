@@ -100,7 +100,6 @@ if __name__ == "__main__":
         len(pcds) - train_num - test_num,
     )
     print("Writing...")
-
     # Write point clouds
     for i in range(len(pcds)):
         if i < train_num:
@@ -116,34 +115,38 @@ if __name__ == "__main__":
             num = (i - train_num - test_num) % 15
             name = "val"
 
-        filename = (
-            f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-{seq}_{str(num).zfill(3)}"
-        )
+        path_name = "./out/"
+        filename = f"{name}-{date}-{str(batch).zfill(2)}@seq-{seq}"
+        file_num = str(num).zfill(3)
 
-        o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
+        print(f"Writing {filename}_{file_num}")
+
+        o3d.io.write_point_cloud(f"{path_name}{filename}_{file_num}.ply", pcds[i])
         array = np.asarray(pcds[i].points)
-        np.savez(f"{filename}.npz", pcd=array, color=np.zeros(array.shape, dtype=float))
+        np.savez(
+            f"{path_name}{filename}_{file_num}.npz",
+            pcd=array,
+            color=np.zeros(array.shape, dtype=float),
+        )
 
         # Write point cloud file names into text files
         f = open(f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-{seq}.txt", "a+")
-        f.write(
-            f"{name}-{date}-{str(batch).zfill(2)}@seq-{seq}_{str(num).zfill(3)}.npz\n"
-        )
+        f.write(f"{filename}_{file_num}.npz\n")
 
         f.close()
 
     # Change text file's format
     for i in range(18):
-        if i < 10:
-            filename = f"./out/train-12_12_14-0{i}@seq-{seq}.txt"
-        elif i < 14:
-            filename = f"./out/train-12_12_14-{i}@seq-{seq}.txt"
+        if i < 14:
+            split = "train"
         elif i < 16:
-            filename = f"./out/test-12_12_14-0{i%2}@seq-{seq}.txt"
+            split = "test"
         else:
-            filename = f"./out/val-12_12_14-0{i%2}@seq-{seq}.txt"
+            split = "val"
 
+        filename = f"./out/{split}-{date}-{str(i%2).zfill(2)}@seq-{seq}.txt"
         f = open(filename, "r")
+
         lines = []
         for line in f.readlines():
             lines.append(line.strip())
