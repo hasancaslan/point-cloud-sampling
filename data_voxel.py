@@ -124,7 +124,7 @@ if __name__ == "__main__":
         np.savez(
             f"{filename}.npz",
             pcd=np.asarray(pcds[i].points),
-            color=np.zeros(pcds[i].shape, dtype=float64),
+            color=np.zeros(pcds[i].points.shape, dtype=float64),
         )
 
         f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
