@@ -83,11 +83,15 @@ if __name__ == "__main__":
 
     print("Assigning voxels...")
     pcds = []
+    count = 0
     for voxel in voxels:
         pcd_voxel = o3d.geometry.PointCloud()
         pcd_voxel.points = o3d.utility.Vector3dVector(voxel.contains_points(pcdarray))
-
         pcds.append(pcd_voxel)
+
+        count += 1
+        if count > 2:
+            break
 
     train_num = int(len(pcds) * 0.8)
     test_num = int(len(pcds) * 0.1)
@@ -122,9 +126,7 @@ if __name__ == "__main__":
 
         o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
         array = np.asarray(pcds[i].points)
-        np.savez(
-            f"{filename}.npz", pcd=array, color=np.zeros(array.shape, dtype=float64)
-        )
+        np.savez(f"{filename}.npz", pcd=array, color=np.zeros(array.shape, dtype=float))
 
         f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
         f.write(
