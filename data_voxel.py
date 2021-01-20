@@ -56,16 +56,12 @@ def get_random_color():
     ]
 
 
-cube = Cube.from_voxel_size((5, 15, -5), 10)
-points = np.array([[3, 15, -8], [11, 15, -8]])
-
-cube.contains_points(points)
-
 if __name__ == "__main__":
     data_dir = "./data-set"
     N = 1000
     voxel_size = 3
-    pcd_path = data_dir + "/12-12-14-MergedCloud-ply.ply"
+    date = "13-11-23"
+    pcd_path = data_dir + f"/{date}-MergedCloud-ply.ply"
     pcd = o3d.io.read_point_cloud(pcd_path)
 
     print(np.asarray(pcd.points).shape)
@@ -119,16 +115,14 @@ if __name__ == "__main__":
             name = "val"
 
         filename = (
-            f"./out/{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}"
+            f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-02_{str(num).zfill(3)}"
         )
 
         o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
         array = np.asarray(pcds[i].points)
         np.savez(f"{filename}.npz", pcd=array, color=np.zeros(array.shape, dtype=float))
 
-        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
-        f.write(
-            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.npz\n"
-        )
+        f = open(f"./out/{name}-{date}-{str(batch).zfill(2)}.txt", "a+")
+        f.write(f"{name}-{date}-{str(batch).zfill(2)}@seq-02_{str(num).zfill(3)}.npz\n")
 
         f.close()
