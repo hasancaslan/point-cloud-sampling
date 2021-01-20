@@ -121,14 +121,15 @@ if __name__ == "__main__":
         )
 
         o3d.io.write_point_cloud(f"{filename}.ply", pcds[i])
-        np.savez(f"{filename}.npz", pcd=np.asarray(pcds[i].points))
+        np.savez(
+            f"{filename}.npz",
+            pcd=np.asarray(pcds[i].points),
+            color=np.zeros(pcds[i].shape, dtype=float64),
+        )
 
-        f = open(f"./out/npz-{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
+        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
         f.write(
             f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.npz\n"
         )
-        f = open(f"./out/{name}-12_12_14-{str(batch).zfill(2)}.txt", "a+")
-        f.write(
-            f"{name}-12_12_14-{str(batch).zfill(2)}@seq-01_{str(num).zfill(3)}.ply\n"
-        )
+
         f.close()
