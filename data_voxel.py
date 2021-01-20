@@ -83,7 +83,10 @@ if __name__ == "__main__":
 
     print("Assigning voxels...")
     pcds = []
+    count = 0
     for voxel in voxels:
+        count += 1
+        print(f"[{count}/{len(voxels)}]")
         pcd_voxel = o3d.geometry.PointCloud()
         pcd_voxel.points = o3d.utility.Vector3dVector(voxel.contains_points(pcdarray))
         pcds.append(pcd_voxel)
