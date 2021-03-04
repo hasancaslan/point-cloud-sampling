@@ -1,6 +1,9 @@
 import open3d as o3d
 import numpy as np
 import random
+import argparse
+import os
+import json
 
 
 class Cube(object):
@@ -18,7 +21,7 @@ class Cube(object):
         Rectangle.from_points(Point(0, 10, -10),
                               Point(10, 20, 0)) == Rectangle((0, 10), (10, 20), (-10, 0))
         """ """
-    
+
         x = (a[:, None] < b).all(-1)
         return cls(*zip(firstcorner, secondcorner))
     """
@@ -56,104 +59,215 @@ def get_random_color():
     ]
 
 
-if __name__ == "__main__":
-    data_dir = "./data-set"
-    N = 1000
-    voxel_size = 3
-    date = "13-11-23"
-    seq = "02"
-    pcd_path = data_dir + f"/{date}-MergedCloud-ply.ply"
-    pcd = o3d.io.read_point_cloud(pcd_path)
+def read_point_cloud(data_root, filename, transform):
+    pcd = o3d.io.read_point_cloud(os.path.join(data_root, filename))
+    translation_vec = np.array(transform, dtype=np.float64)
+    return pcd.translate(translation_vec)
 
-    print(np.asarray(pcd.points).shape)
 
-    print("N:", N, "voxel size:", voxel_size, "path:", pcd_path)
+def get_cube(pcdarray, center, voxel_size):
+    cube = Cube.from_voxel_size(center, voxel_size)
+    pcd_voxel = o3d.geometry.PointCloud()
+    pcd_voxel.points = o3d.utility.Vector3dVector(cube.contains_points(pcdarray))
+    return pcd_voxel
 
-    print("Downsampling...")
-    downpcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 
-    pcdarray = np.asarray(pcd.points)
-    downarray = np.asarray(downpcd.points)
+def compute_overlap_ratio(pcd0, pcd1, search_voxel_size):
+    matching01 = get_matching_indices(pcd0, pcd1, search_voxel_size, 1)
+    matching10 = get_matching_indices(pcd1, pcd0, search_voxel_size, 1)
+    overlap0 = len(matching01) / len(pcd0.points)
+    overlap1 = len(matching10) / len(pcd1.points)
+    return max(overlap0, overlap1)
 
-    print("Drawing voxels...")
-    voxels = [Cube.from_voxel_size(center, voxel_size) for center in downarray]
 
-    print("Assigning voxels...")
-    pcds = []
-    count = 0
-    for voxel in voxels:
-        count += 1
-        print(f"[{count}/{len(voxels)}]")
-        pcd_voxel = o3d.geometry.PointCloud()
-        pcd_voxel.points = o3d.utility.Vector3dVector(voxel.contains_points(pcdarray))
-        pcds.append(pcd_voxel)
+def get_matching_indices(source, target, search_voxel_size, K=None):
+    pcd_tree = o3d.geometry.KDTreeFlann(target)
 
-    train_num = int(len(pcds) * 0.8)
-    test_num = int(len(pcds) * 0.1)
+    match_inds = []
+    for i, point in enumerate(source.points):
+        [_, idx, _] = pcd_tree.search_radius_vector_3d(point, search_voxel_size)
+        if K is not None:
+            idx = idx[:K]
+        for j in idx:
+            match_inds.append((i, j))
+    return match_inds
 
-    print(
-        "train set num:",
-        train_num,
-        "test set num:",
-        test_num,
-        "val set num:",
-        len(pcds) - train_num - test_num,
+
+def get_valid_neigbors(i, voxels, down_array, down_array_tree, voxel_size, min_percent, max_percent):
+    print(f"Voxel[{i}] - Processing")
+    pairs = []
+    min_overlap_ratio, running_overlap_ratio, max_overlap_ratio = 1.1, 0, -0.1
+    overall_min, overall_max = 1.1, -0.1
+
+    voxel = voxels[i]
+    [k, idx1, _] = down_array_tree.search_radius_vector_3d(down_array[i], voxel_size)
+    [k, idx2, _] = down_array_tree.search_radius_vector_3d(down_array[i], voxel_size / 2)
+    idx1, idx2 = np.asarray(idx1), np.asarray(idx2)
+    idx = np.setdiff1d(idx1, idx2)
+    neighbors = idx[1:]
+    print(f"Voxel[{i}] - Neighbors: {len(neighbors)}")
+
+    for neighbor in neighbors:
+        overlap_ratio = compute_overlap_ratio(voxel, voxels[neighbor], 0.5)
+        overall_min = min(overall_min, overlap_ratio)
+        overall_max = max(overall_max, overlap_ratio)
+        if min_percent <= overlap_ratio <= max_percent:
+            pairs.append((i, neighbor, overlap_ratio))
+            min_overlap_ratio = min(min_overlap_ratio, overlap_ratio)
+            running_overlap_ratio += overlap_ratio
+            max_overlap_ratio = max(max_overlap_ratio, overlap_ratio)
+
+    avg_overlap_ratio = running_overlap_ratio / len(pairs)
+    print(f"Voxel[{i}] - Overall Min Overlap: {overall_min:.4f}")
+    print(f"Voxel[{i}] - Overall Max Overlap: {overall_max:.4f}")
+    print(f"Voxel[{i}] - Pairs: {len(pairs)}")
+    print(f"Voxel[{i}] - Min Overlap Ratio: {min_overlap_ratio:.4f}")
+    print(f"Voxel[{i}] - Max Overlap Ratio: {max_overlap_ratio:.4f}")
+    print(f"Voxel[{i}] - Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
+
+    return pairs, running_overlap_ratio
+
+
+class Dataset:
+    def __init__(self, data_root, config, dset, out_dir):
+        self.data_root = data_root
+        self.name = dset["name"]
+        self.seqs = {seq: config["seqs"][seq] for seq in dset["seqs"]}
+        self.out_dir = out_dir
+
+    def process(self, voxel_size, min_percent, max_percent):
+        for seq in self.seqs:
+            seq_data = self.seqs[seq]
+            filename, transform = seq_data['filename'], seq_data['transform']
+            pcd = read_point_cloud(self.data_root, filename, transform)
+            pcd.paint_uniform_color(get_random_color())
+            min_bound = pcd.get_min_bound()
+            max_bound = pcd.get_max_bound()
+            print(pcd)
+            print("Minimum bound:", min_bound)
+            print("Maximum bound:", max_bound)
+
+            pcd_n = pcd.voxel_down_sample(voxel_size=0.05)
+            print(pcd_n)
+
+            downsample_voxel_size = voxel_size / 2
+            downpcd = pcd.voxel_down_sample(voxel_size=downsample_voxel_size)
+
+            pcd_n_array = np.asarray(pcd_n.points)
+            down_array = np.asarray(downpcd.points)
+
+            voxels = {i: get_cube(pcd_n_array, center, voxel_size) for i, center in enumerate(down_array)}
+            kdtree = o3d.geometry.KDTreeFlann(downpcd)
+
+            print("Processing neighbors")
+            pairs = []
+            running_overlap_ratio = 0
+            for i, voxel in voxels.items():
+                i_pairs, i_running_overlap_ratio = get_valid_neigbors(i, voxels, down_array, kdtree, voxel_size,
+                                                                      min_percent, max_percent)
+                pairs += i_pairs
+                running_overlap_ratio += i_running_overlap_ratio
+                if i == 1:  # TODO
+                    break
+            avg_overlap_ratio = running_overlap_ratio / len(pairs)
+            print(f"All Pairs Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
+
+            idx = self.get_valid_points(pairs)
+            filenames = self.compute_filenames(idx, seq)
+
+            pcd_array = np.asarray(pcd.points)
+            for i in idx:
+                cube = get_cube(pcd_array, down_array[i], voxel_size)
+                filename = filenames[i]
+                o3d.io.write_point_cloud(f"{filename}.ply", cube)
+                np.savez(f"{filename}.npz", pcd=np.asarray(cube.points))
+
+            pairs_filename = os.path.join(self.out_dir, f"{self.name}@seq-{seq}.txt")
+            with open(pairs_filename, 'w') as f:
+                for i1, i2, rat in pairs:
+                    f.write(f"{i1} {i2} {rat}\n")
+
+    def get_valid_points(self, pairs):
+        idx = set()
+        for i1, i2, _ in pairs:
+            idx.add(i1)
+            idx.add(i2)
+        return idx
+
+    def compute_filenames(self, idx, seq):
+        filenames = dict()
+        for i in idx:
+            filenames[i] = os.path.join(self.out_dir, f"{self.name}@seq-{seq}_{str(i).zfill(3)}")
+        return filenames
+
+    def __repr__(self):
+        from pprint import pformat
+        return pformat(vars(self), indent=4, width=1)
+
+
+def get_config():
+    parser = argparse.ArgumentParser(description="Point Cloud Overlapping Patch Sampler")
+    parser.add_argument(
+        "-d",
+        "--data-root",
+        type=str,
+        default="data-set",
+        help="Data Root Directory",
+        metavar="DIR"
     )
-    print("Writing...")
-    # Write point clouds
-    for i in range(len(pcds)):
-        if i < train_num:
-            batch = i // 15
-            num = i % 15
-            name = "train"
-        elif i < train_num + test_num:
-            batch = (i - train_num) // 15
-            num = (i - train_num) % 15
-            name = "test"
-        else:
-            batch = (i - train_num - test_num) // 15
-            num = (i - train_num - test_num) % 15
-            name = "val"
+    parser.add_argument(
+        "-o",
+        "--out-dir",
+        type=str,
+        default="out",
+        help="Output Directory",
+        metavar="OUT-DIR"
+    )
+    parser.add_argument(
+        "-c",
+        "--config-file",
+        type=str,
+        default="data-config.json",
+        help="Dataset Configuration File",
+        metavar="data-config.json"
+    )
+    parser.add_argument(
+        "-v",
+        "--voxel-size",
+        type=int,
+        default=5,
+        help="Voxel size"
+    )
+    parser.add_argument(
+        "--min-percent",
+        type=float,
+        default=0.30,
+        help="Min Correspondence Percentage"
+    )
+    parser.add_argument(
+        "--max-percent",
+        type=float,
+        default=0.9,
+        help="Max Correspondence Percentage"
+    )
+    args = parser.parse_args()
 
-        path_name = "./out/"
-        filename = f"{name}-{date}-{str(batch).zfill(2)}@seq-{seq}"
-        file_num = str(num).zfill(3)
+    with open(os.path.join(args.data_root, args.config_file), 'r') as conf:
+        config = json.load(conf)
 
-        print(f"Writing {filename}_{file_num}")
+    return args, config
 
-        o3d.io.write_point_cloud(f"{path_name}{filename}_{file_num}.ply", pcds[i])
-        array = np.asarray(pcds[i].points)
-        np.savez(
-            f"{path_name}{filename}_{file_num}.npz",
-            pcd=array,
-            color=np.zeros(array.shape, dtype=float),
-        )
 
-        # Write point cloud file names into text files
-        f = open(f"./out/{name}-{date}-{str(batch).zfill(2)}@seq-{seq}.txt", "a+")
-        f.write(f"{filename}_{file_num}.npz\n")
+def main():
+    args, config = get_config()
+    datasets = [Dataset(args.data_root, config, dset, args.out_dir) for dset in config["datasets"]]
+    for dataset in datasets:
+        print("Processing Dataset", dataset.name)
+        print(dataset)
+        print("=====")
+        dataset.process(args.voxel_size, args.min_percent, args.max_percent)
+        print("Processing finished\n")
 
-        f.close()
 
-    # Change text file's format
-    for i in range(18):
-        if i < 14:
-            split = "train"
-        elif i < 16:
-            split = "test"
-        else:
-            split = "val"
-
-        filename = f"./out/{split}-{date}-{str(i%2).zfill(2)}@seq-{seq}.txt"
-        f = open(filename, "r")
-
-        lines = []
-        for line in f.readlines():
-            lines.append(line.strip())
-
-        f = open(filename, "w+")
-        for i in range(len(lines) - 1):
-            for j in range(i + 1, len(lines)):
-                f.write(lines[i] + " " + lines[j] + " " + "0.000000" + "\n")
-
-        f.close()
+if __name__ == "__main__":
+    main()
