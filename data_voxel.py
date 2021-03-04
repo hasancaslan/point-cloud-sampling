@@ -108,7 +108,7 @@ def get_valid_neigbors(i, voxels, down_array, down_array_tree, voxel_size, min_p
     print(f"Voxel[{i}] - Neighbors: {len(neighbors)}")
 
     for neighbor in neighbors:
-        overlap_ratio = compute_overlap_ratio(voxel, voxels[neighbor], 0.5)
+        overlap_ratio = compute_overlap_ratio(voxel, voxels[neighbor], 0.05 * 4)
         overall_min = min(overall_min, overlap_ratio)
         overall_max = max(overall_max, overlap_ratio)
         if min_percent <= overlap_ratio <= max_percent:
@@ -117,13 +117,15 @@ def get_valid_neigbors(i, voxels, down_array, down_array_tree, voxel_size, min_p
             running_overlap_ratio += overlap_ratio
             max_overlap_ratio = max(max_overlap_ratio, overlap_ratio)
 
-    avg_overlap_ratio = running_overlap_ratio / len(pairs)
     print(f"Voxel[{i}] - Overall Min Overlap: {overall_min:.4f}")
     print(f"Voxel[{i}] - Overall Max Overlap: {overall_max:.4f}")
-    print(f"Voxel[{i}] - Pairs: {len(pairs)}")
-    print(f"Voxel[{i}] - Min Overlap Ratio: {min_overlap_ratio:.4f}")
-    print(f"Voxel[{i}] - Max Overlap Ratio: {max_overlap_ratio:.4f}")
-    print(f"Voxel[{i}] - Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
+
+    if len(pairs) != 0:
+        avg_overlap_ratio = running_overlap_ratio / len(pairs)
+        print(f"Voxel[{i}] - Pairs: {len(pairs)}")
+        print(f"Voxel[{i}] - Min Overlap Ratio: {min_overlap_ratio:.4f}")
+        print(f"Voxel[{i}] - Max Overlap Ratio: {max_overlap_ratio:.4f}")
+        print(f"Voxel[{i}] - Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
 
     return pairs, running_overlap_ratio
 
@@ -167,8 +169,6 @@ class Dataset:
                                                                       min_percent, max_percent)
                 pairs += i_pairs
                 running_overlap_ratio += i_running_overlap_ratio
-                if i == 1:  # TODO
-                    break
             avg_overlap_ratio = running_overlap_ratio / len(pairs)
             print(f"All Pairs Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
 
