@@ -4,51 +4,7 @@ import random
 import argparse
 import os
 import json
-
-
-class Cube(object):
-    def __init__(self, range):
-        """
-        Builds a cube from x, y and z ranges
-        """
-        self.range = range
-
-    """
-    @classmethod
-    def from_points(cls, firstcorner, secondcorner):
-        """ """
-        Builds a cube from the bounding points
-        Rectangle.from_points(Point(0, 10, -10),
-                              Point(10, 20, 0)) == Rectangle((0, 10), (10, 20), (-10, 0))
-        """ """
-
-        x = (a[:, None] < b).all(-1)
-        return cls(*zip(firstcorner, secondcorner))
-    """
-
-    @classmethod
-    def from_voxel_size(cls, center, voxel_size):
-        """
-        Builds a cube from the voxel size and center of the voxel
-        """
-        cls.center = center
-        half_center = voxel_size / 2
-        x_range = (center[0] - half_center, center[0] + half_center)
-        y_range = (center[1] - half_center, center[1] + half_center)
-        z_range = (center[2] - half_center, center[2] + half_center)
-        range = np.array(
-            [[x_range[0], x_range[1], y_range[0], y_range[1], z_range[0], z_range[1]]]
-        )
-        return cls(range)
-
-    def contains_points(self, p):
-        """
-        Returns given point is in cube
-        """
-        less = np.repeat(self.range, repeats=[p.shape[0]], axis=0)[:, 0::2] < p
-        greater = np.repeat(self.range, repeats=[p.shape[0]], axis=0)[:, 1::2] > p
-        filter = np.logical_and(less.all(axis=1), greater.all(axis=1))
-        return p[filter]
+from tqdm import tqdm
 
 
 def get_random_color():
@@ -59,146 +15,168 @@ def get_random_color():
     ]
 
 
-def read_point_cloud(data_root, filename, transform):
-    pcd = o3d.io.read_point_cloud(os.path.join(data_root, filename))
-    translation_vec = np.array(transform, dtype=np.float64)
-    return pcd.translate(translation_vec)
+def roi_rectangle(pcdarray, minxy, size):
+    maxxy = minxy + size
+    xy_pts = pcdarray[:, [0, 1]]
+    inidx = np.all((minxy <= xy_pts) & (xy_pts <= maxxy), axis=1)
+    return pcdarray[inidx]
 
 
-def get_cube(pcdarray, center, voxel_size):
-    cube = Cube.from_voxel_size(center, voxel_size)
+def get_rectangle_pcd(pcdarray, minxy, size):
+    pts = roi_rectangle(pcdarray, minxy, size)
+    if len(pts) == 0:
+        return None
     pcd_voxel = o3d.geometry.PointCloud()
-    pcd_voxel.points = o3d.utility.Vector3dVector(cube.contains_points(pcdarray))
+    pcd_voxel.points = o3d.utility.Vector3dVector(pts)
     return pcd_voxel
 
 
-def compute_overlap_ratio(pcd0, pcd1, search_voxel_size):
-    matching01 = get_matching_indices(pcd0, pcd1, search_voxel_size, 1)
-    matching10 = get_matching_indices(pcd1, pcd0, search_voxel_size, 1)
-    overlap0 = len(matching01) / len(pcd0.points)
-    overlap1 = len(matching10) / len(pcd1.points)
+def compute_overlap_ratio(pcd0, pcd1, voxel_size):
+    pcd0_down = pcd0.voxel_down_sample(voxel_size)
+    pcd1_down = pcd1.voxel_down_sample(voxel_size)
+    matching01 = get_matching_indices(pcd0_down, pcd1_down, voxel_size)
+    matching10 = get_matching_indices(pcd1_down, pcd0_down, voxel_size)
+    overlap0 = len(matching01) / len(pcd0_down.points)
+    overlap1 = len(matching10) / len(pcd1_down.points)
     return max(overlap0, overlap1)
 
 
-def get_matching_indices(source, target, search_voxel_size, K=None):
+def get_matching_indices(source, target, search_voxel_size):
     pcd_tree = o3d.geometry.KDTreeFlann(target)
 
     match_inds = []
     for i, point in enumerate(source.points):
-        [_, idx, _] = pcd_tree.search_radius_vector_3d(point, search_voxel_size)
-        if K is not None:
-            idx = idx[:K]
+        [_, idx, _] = pcd_tree.search_hybrid_vector_3d(point, search_voxel_size, 1)
+        idx = idx[:1]
         for j in idx:
             match_inds.append((i, j))
     return match_inds
 
 
-def get_valid_neigbors(i, voxels, down_array, down_array_tree, voxel_size, min_percent, max_percent):
-    print(f"Voxel[{i}] - Processing")
+def get_valid_pairs(voxel_pairs, min_percent, matching_search_voxel_size=0.2):
     pairs = []
     min_overlap_ratio, running_overlap_ratio, max_overlap_ratio = 1.1, 0, -0.1
     overall_min, overall_max = 1.1, -0.1
 
-    voxel = voxels[i]
-    [k, idx1, _] = down_array_tree.search_radius_vector_3d(down_array[i], voxel_size)
-    [k, idx2, _] = down_array_tree.search_radius_vector_3d(down_array[i], voxel_size / 2)
-    idx1, idx2 = np.asarray(idx1), np.asarray(idx2)
-    idx = np.setdiff1d(idx1, idx2)
-    neighbors = idx[1:]
-    print(f"Voxel[{i}] - Neighbors: {len(neighbors)}")
-
-    for neighbor in neighbors:
-        overlap_ratio = compute_overlap_ratio(voxel, voxels[neighbor], 0.05 * 4)
+    for pcd1, pcd2 in tqdm(voxel_pairs):
+        overlap_ratio = compute_overlap_ratio(pcd1, pcd2, matching_search_voxel_size)
         overall_min = min(overall_min, overlap_ratio)
         overall_max = max(overall_max, overlap_ratio)
-        if min_percent <= overlap_ratio <= max_percent:
-            pairs.append((i, neighbor, overlap_ratio))
+        if min_percent <= overlap_ratio:
+            pairs.append((pcd1, pcd2, overlap_ratio))
             min_overlap_ratio = min(min_overlap_ratio, overlap_ratio)
             running_overlap_ratio += overlap_ratio
             max_overlap_ratio = max(max_overlap_ratio, overlap_ratio)
 
-    print(f"Voxel[{i}] - Overall Min Overlap: {overall_min:.4f}")
-    print(f"Voxel[{i}] - Overall Max Overlap: {overall_max:.4f}")
+    stats = [
+        ("Overall Min Overlap", overall_min),
+        ("Overall Max Overlap", overall_max),
+    ]
 
     if len(pairs) != 0:
         avg_overlap_ratio = running_overlap_ratio / len(pairs)
-        print(f"Voxel[{i}] - Pairs: {len(pairs)}")
-        print(f"Voxel[{i}] - Min Overlap Ratio: {min_overlap_ratio:.4f}")
-        print(f"Voxel[{i}] - Max Overlap Ratio: {max_overlap_ratio:.4f}")
-        print(f"Voxel[{i}] - Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
+        stats.extend([
+            ("Min Overlap Ratio", min_overlap_ratio),
+            ("Max Overlap Ratio", max_overlap_ratio),
+            ("Avg Overlap Ratio", avg_overlap_ratio),
+        ])
 
-    return pairs, running_overlap_ratio
+    return pairs, stats
+
+
+class Sequence:
+    def __init__(self, data_root, name, seq_config):
+        self.name = name
+        self.path = os.path.join(data_root, seq_config['filename'])
+        self.transform = seq_config['transform']
+        self._pcd = None
+
+    def _read_pcd(self):
+        pcd = o3d.io.read_point_cloud(self.path)
+        translation_vec = np.array(self.transform, dtype=np.float64)
+        self._pcd = pcd.translate(translation_vec)
+        print(f"Read pcd {self}:\n\t{self._pcd}")
+
+    def _check_pcd(self):
+        if self._pcd is None:
+            self._read_pcd()
+
+    def get_pcd(self):
+        self._check_pcd()
+        return self._pcd
+
+    def get_pcd_array(self):
+        self._check_pcd()
+        return np.asarray(self._pcd.points)
+
+    def get_bounds(self):
+        self._check_pcd()
+        bbox = self._pcd.get_axis_aligned_bounding_box()
+        return bbox.get_min_bound(), bbox.get_max_bound()
+
+    def __repr__(self):
+        return f"Sequence \"{self.name}\" at \"{self.path}\""
 
 
 class Dataset:
-    def __init__(self, data_root, config, dset, out_dir):
+    def __init__(self, data_root, seq_map, dset, out_dir):
         self.data_root = data_root
         self.name = dset["name"]
-        self.seqs = {seq: config["seqs"][seq] for seq in dset["seqs"]}
+        self.first_seq = seq_map[dset["first"]]
+        self.second_seq = seq_map[dset["second"]]
+        self.rect_size = np.array(dset["rectangle-size"])
+        self.interval = np.array(dset["interval"])
+        self.min_percent = dset["min-percent"]
         self.out_dir = out_dir
 
-    def process(self, voxel_size, min_percent, max_percent):
-        for seq in self.seqs:
-            seq_data = self.seqs[seq]
-            filename, transform = seq_data['filename'], seq_data['transform']
-            pcd = read_point_cloud(self.data_root, filename, transform)
-            pcd.paint_uniform_color(get_random_color())
-            min_bound = pcd.get_min_bound()
-            max_bound = pcd.get_max_bound()
-            print(pcd)
-            print("Minimum bound:", min_bound)
-            print("Maximum bound:", max_bound)
+    def process(self):
+        min_b1, max_b1 = self.first_seq.get_bounds()
+        min_b2, max_b2 = self.second_seq.get_bounds()
+        min_bound, max_bound = np.amin([min_b1, min_b2], axis=0), np.amax([max_b1, max_b2], axis=0)
+        print("Minimum bound:", min_bound)
+        print("Maximum bound:", max_bound)
+        x_starts = np.arange(min_bound[0], max_bound[0] - self.rect_size[0] / 2, self.interval[0])
+        y_starts = np.arange(min_bound[1], max_bound[1] - self.rect_size[1] / 2, self.interval[1])
+        minxy_points = np.transpose([np.tile(x_starts, len(y_starts)), np.repeat(y_starts, len(x_starts))])
 
-            pcd_n = pcd.voxel_down_sample(voxel_size=0.05)
-            print(pcd_n)
+        first_pcd_points = self.first_seq.get_pcd_array()
+        second_pcd_points = self.second_seq.get_pcd_array()
+        voxel_pairs = []
+        print(f"Reading pairs, {len(minxy_points)} candidates")
+        for minxy in tqdm(minxy_points):
+            voxel1 = get_rectangle_pcd(first_pcd_points, minxy, self.rect_size)
+            if voxel1 is None:
+                continue
+            voxel2 = get_rectangle_pcd(second_pcd_points, minxy, self.rect_size)
+            if voxel2 is None:
+                continue
+            voxel_pairs.append((voxel1, voxel2))
+        print(f"Read {len(voxel_pairs)} pairs")
+        print("Filtering valid pairs")
+        valid_pairs, stats = get_valid_pairs(voxel_pairs, self.min_percent)
+        print(f"Filtered {len(valid_pairs)} valid pairs")
+        for name, value in stats:
+            print(f"{name}: {value:.4f}")
 
-            downsample_voxel_size = voxel_size / 2
-            downpcd = pcd.voxel_down_sample(voxel_size=downsample_voxel_size)
+        print("Writing pair files")
+        filenames = []
+        for i, (pcd1, pcd2, ratio) in enumerate(tqdm(valid_pairs)):
+            filename1 = f"{self.name}@seq-{self.first_seq.name}_{str(i).zfill(3)}"
+            filename2 = f"{self.name}@seq-{self.second_seq.name}_{str(i).zfill(3)}"
+            filenames.append((f"{filename1}.npz", f"{filename2}.npz", ratio))
 
-            pcd_n_array = np.asarray(pcd_n.points)
-            down_array = np.asarray(downpcd.points)
+            filename1 = os.path.join(self.out_dir, filename1)
+            o3d.io.write_point_cloud(f"{filename1}.ply", pcd1)
+            np.savez(f"{filename1}.npz", pcd=np.asarray(pcd1.points))
 
-            voxels = {i: get_cube(pcd_n_array, center, voxel_size) for i, center in enumerate(down_array)}
-            kdtree = o3d.geometry.KDTreeFlann(downpcd)
+            filename2 = os.path.join(self.out_dir, filename2)
+            o3d.io.write_point_cloud(f"{filename2}.ply", pcd2)
+            np.savez(f"{filename2}.npz", pcd=np.asarray(pcd2.points))
 
-            print("Processing neighbors")
-            pairs = []
-            running_overlap_ratio = 0
-            for i, voxel in voxels.items():
-                i_pairs, i_running_overlap_ratio = get_valid_neigbors(i, voxels, down_array, kdtree, voxel_size,
-                                                                      min_percent, max_percent)
-                pairs += i_pairs
-                running_overlap_ratio += i_running_overlap_ratio
-            avg_overlap_ratio = running_overlap_ratio / len(pairs)
-            print(f"All Pairs Avg Overlap Ratio: {avg_overlap_ratio:.4f}")
-
-            idx = self.get_valid_points(pairs)
-            filenames = self.compute_filenames(idx, seq)
-
-            pcd_array = np.asarray(pcd.points)
-            for i in idx:
-                cube = get_cube(pcd_array, down_array[i], voxel_size)
-                filename = filenames[i]
-                o3d.io.write_point_cloud(f"{filename}.ply", cube)
-                np.savez(f"{filename}.npz", pcd=np.asarray(cube.points))
-
-            pairs_filename = os.path.join(self.out_dir, f"{self.name}@seq-{seq}.txt")
-            with open(pairs_filename, 'w') as f:
-                for i1, i2, rat in pairs:
-                    f.write(f"{i1} {i2} {rat}\n")
-
-    def get_valid_points(self, pairs):
-        idx = set()
-        for i1, i2, _ in pairs:
-            idx.add(i1)
-            idx.add(i2)
-        return idx
-
-    def compute_filenames(self, idx, seq):
-        filenames = dict()
-        for i in idx:
-            filenames[i] = os.path.join(self.out_dir, f"{self.name}@seq-{seq}_{str(i).zfill(3)}")
-        return filenames
+        dset_file = os.path.join(self.out_dir, f"dataset-{self.name}.txt")
+        with open(dset_file, 'w') as f:
+            for f1, f2, rat in filenames:
+                f.write(f"{f1} {f2} {rat}\n")
 
     def __repr__(self):
         from pprint import pformat
@@ -231,27 +209,7 @@ def get_config():
         help="Dataset Configuration File",
         metavar="data-config.json"
     )
-    parser.add_argument(
-        "-v",
-        "--voxel-size",
-        type=int,
-        default=5,
-        help="Voxel size"
-    )
-    parser.add_argument(
-        "--min-percent",
-        type=float,
-        default=0.30,
-        help="Min Correspondence Percentage"
-    )
-    parser.add_argument(
-        "--max-percent",
-        type=float,
-        default=0.9,
-        help="Max Correspondence Percentage"
-    )
     args = parser.parse_args()
-
     with open(os.path.join(args.data_root, args.config_file), 'r') as conf:
         config = json.load(conf)
 
@@ -260,12 +218,13 @@ def get_config():
 
 def main():
     args, config = get_config()
-    datasets = [Dataset(args.data_root, config, dset, args.out_dir) for dset in config["datasets"]]
-    for dataset in datasets:
+    sequences = {name: Sequence(args.data_root, name, seq) for name, seq in config["seqs"].items()}
+    for dset in config["datasets"]:
+        dataset = Dataset(args.data_root, sequences, dset, args.out_dir)
         print("Processing Dataset", dataset.name)
         print(dataset)
         print("=====")
-        dataset.process(args.voxel_size, args.min_percent, args.max_percent)
+        dataset.process()
         print("Processing finished\n")
 
 
